@@ -2,16 +2,23 @@ package org.wradlib.wradlibsimpleapp;
 
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Toast;
 
 import com.carto.core.BinaryData;
 import com.carto.core.MapPos;
+import com.carto.core.Variant;
+import com.carto.datasources.LocalVectorDataSource;
 import com.carto.datasources.PackageManagerTileDataSource;
 import com.carto.layers.CartoBaseMapStyle;
 import com.carto.layers.CartoOnlineVectorTileLayer;
+import com.carto.layers.Layer;
+import com.carto.layers.VectorLayer;
 import com.carto.layers.VectorTileLayer;
 import com.carto.packagemanager.CartoPackageManager;
 import com.carto.projections.Projection;
+import com.carto.services.CartoVisBuilder;
+import com.carto.services.CartoVisLoader;
 import com.carto.styles.CompiledStyleSet;
 import com.carto.ui.MapView;
 import com.carto.utils.AssetUtils;
@@ -78,6 +85,66 @@ public class MainActivity extends AppCompatActivity {
 
         mapView.setFocusPos(bonnPos, 0);
         mapView.setZoom(14, 0);
+        String url = "http://documentation.carto.com/api/v2/viz/2b13c956-e7c1-11e2-806b-5404a6a683d5/viz.json";
+        updateVis(url);
+
 
     }
+
+    protected void updateVis(final String url) {
+        Thread thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                mapView.getLayers().clear();
+
+                // Create overlay layer for popups
+                Projection proj = mapView.getOptions().getBaseProjection();
+                LocalVectorDataSource dataSource = new LocalVectorDataSource(proj);
+                VectorLayer vectorLayer = new VectorLayer(dataSource);
+
+                // Create VIS loader
+                CartoVisLoader loader = new CartoVisLoader();
+                loader.setDefaultVectorLayerMode(true);
+                MyCartoVisBuilder visBuilder = new MyCartoVisBuilder(vectorLayer);
+                try {
+                    loader.loadVis(visBuilder, url);
+                }
+                catch (IOException e) {
+                    Log.e("EXCEPTION", "Exception: " + e);
+                }
+
+                // Add the created popup overlay layer on top of all visJSON layers
+                mapView.getLayers().add(vectorLayer);
+            }
+        });
+
+        thread.start(); // TODO: should serialize execution
+    }
+
+    private class MyCartoVisBuilder extends CartoVisBuilder {
+        private VectorLayer vectorLayer; // vector layer for popups
+
+        public MyCartoVisBuilder(VectorLayer vectorLayer) {
+            this.vectorLayer = vectorLayer;
+        }
+
+        @Override
+        public void setCenter(MapPos mapPos) {
+            MapPos position = mapView.getOptions().getBaseProjection().fromWgs84(mapPos);
+            mapView.setFocusPos(position, 1.0f);
+        }
+
+        @Override
+        public void setZoom(float zoom) {
+            mapView.setZoom(zoom, 1.0f);
+        }
+
+        @Override
+        public void addLayer(Layer layer, Variant attributes) {
+            // Add the layer to the map view
+            mapView.getLayers().add(layer);
+        }
+    }
+
 }
+
