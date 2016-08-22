@@ -2,12 +2,24 @@ package org.wradlib.wradlibsimpleapp;
 
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.widget.Toast;
 
+import com.carto.core.BinaryData;
 import com.carto.core.MapPos;
+import com.carto.datasources.PackageManagerTileDataSource;
 import com.carto.layers.CartoBaseMapStyle;
 import com.carto.layers.CartoOnlineVectorTileLayer;
+import com.carto.layers.VectorTileLayer;
+import com.carto.packagemanager.CartoPackageManager;
 import com.carto.projections.Projection;
+import com.carto.styles.CompiledStyleSet;
 import com.carto.ui.MapView;
+import com.carto.utils.AssetUtils;
+import com.carto.utils.ZippedAssetPackage;
+import com.carto.vectortiles.MBVectorTileDecoder;
+
+import java.io.File;
+import java.io.IOException;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -24,16 +36,47 @@ public class MainActivity extends AppCompatActivity {
 
         MapView mapView = (MapView) this.findViewById(R.id.map_view);
 
-        CartoOnlineVectorTileLayer layer =
-                new CartoOnlineVectorTileLayer(CartoBaseMapStyle.CARTO_BASEMAP_STYLE_DEFAULT);
+        final String bonn = "bbox(7.0082,50.7284,7.1582,50.7454)";
+        CartoPackageManager manager = null;
+
+        File folder = new File(getApplicationContext().getExternalFilesDir(null), "map_packages");
+
+        if (!folder.isDirectory()) {
+            folder.mkdir();
+        }
+
+        try {
+            manager = new CartoPackageManager("nutiteq.osm", folder.getAbsolutePath());
+        }
+        catch (IOException e) {
+            System.out.println("Exception: " + e.getMessage());
+        }
+
+        if (manager == null) {
+            Toast.makeText(this, "Unable to initialize package manager", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        manager.start();
+
+        if (manager.getLocalPackage(bonn) == null) {
+            manager.startPackageDownload(bonn);
+        }
+
+        PackageManagerTileDataSource source = new PackageManagerTileDataSource(manager);
+        BinaryData styleBytes = AssetUtils.loadAsset("nutibright-v3.zip");
+        CompiledStyleSet styleSet = new CompiledStyleSet(new ZippedAssetPackage(styleBytes));
+
+        MBVectorTileDecoder decoder = new MBVectorTileDecoder(styleSet);
+
+        VectorTileLayer layer = new VectorTileLayer(source, decoder);
+
         mapView.getLayers().add(layer);
 
-        Projection projection = mapView.getOptions().getBaseProjection();
+        MapPos bonnPos = mapView.getOptions().getBaseProjection().fromWgs84(new MapPos(7.0982, 50.7374));
 
-        MapPos berlin = projection.fromWgs84(new MapPos(7.141209, 50.704452));
-        mapView.setFocusPos(berlin, 0);
-        mapView.setZoom(10, 0);
-
+        mapView.setFocusPos(bonnPos, 0);
+        mapView.setZoom(14, 0);
 
     }
 }
