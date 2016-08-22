@@ -10,6 +10,7 @@ import com.carto.core.MapPos;
 import com.carto.core.Variant;
 import com.carto.datasources.LocalVectorDataSource;
 import com.carto.datasources.PackageManagerTileDataSource;
+import com.carto.graphics.Color;
 import com.carto.layers.CartoBaseMapStyle;
 import com.carto.layers.CartoOnlineVectorTileLayer;
 import com.carto.layers.Layer;
@@ -19,14 +20,23 @@ import com.carto.packagemanager.CartoPackageManager;
 import com.carto.projections.Projection;
 import com.carto.services.CartoVisBuilder;
 import com.carto.services.CartoVisLoader;
+import com.carto.styles.BalloonPopupStyle;
+import com.carto.styles.BalloonPopupStyleBuilder;
 import com.carto.styles.CompiledStyleSet;
+import com.carto.styles.MarkerStyle;
+import com.carto.styles.MarkerStyleBuilder;
+import com.carto.ui.MapClickInfo;
+import com.carto.ui.MapEventListener;
 import com.carto.ui.MapView;
 import com.carto.utils.AssetUtils;
 import com.carto.utils.ZippedAssetPackage;
+import com.carto.vectorelements.BalloonPopup;
+import com.carto.vectorelements.Marker;
 import com.carto.vectortiles.MBVectorTileDecoder;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Locale;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -81,12 +91,24 @@ public class MainActivity extends AppCompatActivity {
 
         mapView.getLayers().add(layer);
 
+
         MapPos bonnPos = mapView.getOptions().getBaseProjection().fromWgs84(new MapPos(7.0982, 50.7374));
 
         mapView.setFocusPos(bonnPos, 0);
         mapView.setZoom(14, 0);
         String url = "http://documentation.carto.com/api/v2/viz/2b13c956-e7c1-11e2-806b-5404a6a683d5/viz.json";
         updateVis(url);
+
+        MapPos tallinn = new MapPos(24.646469, 59.426939);
+        addMarkerToPosition(mapView, tallinn);
+
+        LocalVectorDataSource clickSource = new LocalVectorDataSource(mapView.getOptions().getBaseProjection());
+        VectorLayer clickLayer = new VectorLayer(clickSource);
+
+        mapView.getLayers().add(clickLayer);
+
+        mapView.setMapEventListener(new MyMapEventListener(mapView, clickSource));
+
 
 
     }
@@ -121,6 +143,30 @@ public class MainActivity extends AppCompatActivity {
         thread.start(); // TODO: should serialize execution
     }
 
+    private void addMarkerToPosition(MapView map, MapPos wgsPosition)
+    {
+        // Create a new layer
+        Projection projection = map.getOptions().getBaseProjection();
+        LocalVectorDataSource datasource = new LocalVectorDataSource(projection);
+        VectorLayer layer = new VectorLayer(datasource);
+
+        // Add layer to map
+        map.getLayers().add(layer);
+
+        MarkerStyleBuilder builder = new MarkerStyleBuilder();
+        builder.setSize(30);
+
+        builder.setColor(new Color(android.graphics.Color.GREEN));
+
+        // Set marker position and style
+        MapPos position = projection.fromWgs84(wgsPosition);
+        MarkerStyle style = builder.buildStyle();
+
+        // Create marker and add it to the source
+        Marker marker = new Marker(position, style);
+        datasource.add(marker);
+    }
+
     private class MyCartoVisBuilder extends CartoVisBuilder {
         private VectorLayer vectorLayer; // vector layer for popups
 
@@ -143,6 +189,52 @@ public class MainActivity extends AppCompatActivity {
         public void addLayer(Layer layer, Variant attributes) {
             // Add the layer to the map view
             mapView.getLayers().add(layer);
+        }
+    }
+
+    private class MyMapEventListener extends MapEventListener {
+        private MapView mapView;
+        private LocalVectorDataSource vectorDataSource;
+
+        private BalloonPopup oldClickLabel;
+
+        public MyMapEventListener(MapView mapView, LocalVectorDataSource vectorDataSource) {
+            this.mapView = mapView;
+            this.vectorDataSource = vectorDataSource;
+        }
+
+        @Override
+        public void onMapMoved() {
+
+        }
+
+        @Override
+        public void onMapClicked(MapClickInfo mapClickInfo) {
+
+            // Remove old click label
+            if (oldClickLabel != null) {
+                vectorDataSource.remove(oldClickLabel);
+                oldClickLabel = null;
+            }
+
+            BalloonPopupStyleBuilder styleBuilder = new BalloonPopupStyleBuilder();
+
+            // Make sure this label is shown on top all other labels
+            styleBuilder.setPlacementPriority(10);
+
+            MapPos position = mapClickInfo.getClickPos();
+            BalloonPopupStyle style = styleBuilder.buildStyle();
+
+            MapPos wgs84Position = mapView.getOptions().getBaseProjection().toWgs84(position);
+
+            String title = "You just clicked at:";
+            String description = String.format(Locale.US, "%.4f, %.4f", wgs84Position.getY(), wgs84Position.getX());
+
+
+            BalloonPopup clickPopup = new BalloonPopup(position, style, title, description);
+
+            vectorDataSource.add(clickPopup);
+            oldClickLabel = clickPopup;
         }
     }
 
