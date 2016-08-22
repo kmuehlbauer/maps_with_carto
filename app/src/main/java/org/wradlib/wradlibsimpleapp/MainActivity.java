@@ -26,6 +26,7 @@ public class MainActivity extends AppCompatActivity {
 
     static final String LICENSE = "XTUN3Q0ZDc1BGVmtzSng1bjVMdHNJbmFrc0I3d2psT3hBaFFTTUF1L21NSCt1M3FQcnYrYkxOWnJqTFRUbnc9PQoKcHJvZHVjdHM9c2RrLWFuZHJvaWQtNC4qLHNkay1pb3MtNC4qCnBhY2thZ2VOYW1lPSoKd2F0ZXJtYXJrPWN1c3RvbQp2YWxpZFVudGlsPTIwMTYtMDktMDEKdXNlcktleT0zNjNmMTc3Y2YzNjUwMzBmMWVlOGI5M2NiZjU2NzhkYQo=";
     MapView mapView;
+    CartoPackageManager manager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,10 +35,9 @@ public class MainActivity extends AppCompatActivity {
 
         MapView.registerLicense(LICENSE, getApplicationContext());
 
-        MapView mapView = (MapView) this.findViewById(R.id.map_view);
+        mapView = (MapView) this.findViewById(R.id.map_view);
 
         final String bonn = "bbox(7.0082,50.7284,7.1582,50.7454)";
-        CartoPackageManager manager = null;
 
         File folder = new File(getApplicationContext().getExternalFilesDir(null), "map_packages");
 
@@ -62,6 +62,7 @@ public class MainActivity extends AppCompatActivity {
         if (manager.getLocalPackage(bonn) == null) {
             manager.startPackageDownload(bonn);
         }
+
 
         PackageManagerTileDataSource source = new PackageManagerTileDataSource(manager);
         BinaryData styleBytes = AssetUtils.loadAsset("nutibright-v3.zip");
